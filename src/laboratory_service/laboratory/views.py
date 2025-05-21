@@ -33,7 +33,7 @@ class TestCatalogViewSet(viewsets.ModelViewSet):
     queryset = TestCatalog.objects.all()
     serializer_class = TestCatalogSerializer
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_queryset(self):
         queryset = TestCatalog.objects.all()
@@ -53,7 +53,7 @@ class LabOrderViewSet(viewsets.ModelViewSet):
     """ViewSet cho phiếu yêu cầu xét nghiệm."""
     queryset = LabOrder.objects.all()
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -104,7 +104,7 @@ class LabOrderItemViewSet(viewsets.ModelViewSet):
     queryset = LabOrderItem.objects.all()
     serializer_class = LabOrderItemSerializer
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     @action(detail=True, methods=['put'])
     def update_status(self, request, pk=None):
@@ -157,7 +157,7 @@ class LabResultViewSet(viewsets.ModelViewSet):
     """ViewSet cho kết quả xét nghiệm."""
     queryset = LabResult.objects.all()
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
     def get_serializer_class(self):
         if self.action == 'create':
@@ -194,4 +194,4 @@ class TestNormalRangeViewSet(viewsets.ModelViewSet):
     queryset = TestNormalRange.objects.all()
     serializer_class = TestNormalRangeSerializer
     authentication_classes = [CustomJWTAuthentication]
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]

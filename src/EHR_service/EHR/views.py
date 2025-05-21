@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework import permissions, status, viewsets
+from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -25,21 +25,13 @@ from .serializers import (
 
 class MedicalRecordViewSet(viewsets.ModelViewSet):
     """ViewSet for managing medical records."""
+    queryset = MedicalRecord.objects.all()
     serializer_class = MedicalRecordSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow all requests
 
     def get_queryset(self):
         """Filter medical records based on user role and ID."""
         patient_id = self.kwargs.get('patient_id')
-        user_id = self.request.user.id
-        user_role = self.request.user.role.name
-
-        if user_role == 'PATIENT':
-            if int(patient_id) != user_id:
-                return MedicalRecord.objects.none()
-        elif user_role not in ['DOCTOR', 'NURSE', 'ADMIN']:
-            return MedicalRecord.objects.none()
-
         return MedicalRecord.objects.filter(patient_id=patient_id)
 
     def perform_create(self, serializer):
@@ -49,47 +41,40 @@ class MedicalRecordViewSet(viewsets.ModelViewSet):
 
 class EncounterViewSet(viewsets.ModelViewSet):
     """ViewSet for managing encounters."""
+    queryset = Encounter.objects.all()
     serializer_class = EncounterSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow all requests
 
     def get_queryset(self):
         """Filter encounters based on user role and ID."""
         patient_id = self.kwargs.get('patient_id')
-        user_id = self.request.user.id
-        user_role = self.request.user.role.name
-
-        if user_role == 'PATIENT':
-            if int(patient_id) != user_id:
-                return Encounter.objects.none()
-        elif user_role not in ['DOCTOR', 'NURSE', 'ADMIN']:
-            return Encounter.objects.none()
-
         return Encounter.objects.filter(medical_record__patient_id=patient_id)
 
     def perform_create(self, serializer):
         """Create encounter with medical record from patient ID."""
-        medical_record = MedicalRecord.objects.get(patient_id=self.kwargs.get('patient_id'))
+        patient_id = self.kwargs.get('patient_id')
+        medical_record = MedicalRecord.objects.filter(patient_id=patient_id).first()
+        
+        if not medical_record:
+            # If no medical record exists, create one
+            medical_record = MedicalRecord.objects.create(
+                patient_id=patient_id,
+                patient_name=f"Patient {patient_id}"  # Default name
+            )
+        
         serializer.save(medical_record=medical_record)
 
 
 class DiagnosisViewSet(viewsets.ModelViewSet):
     """ViewSet for managing diagnoses."""
+    queryset = Diagnosis.objects.all()
     serializer_class = DiagnosisSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow all requests
 
     def get_queryset(self):
         """Filter diagnoses based on user role and ID."""
         patient_id = self.kwargs.get('patient_id')
         encounter_id = self.kwargs.get('encounter_id')
-        user_id = self.request.user.id
-        user_role = self.request.user.role.name
-
-        if user_role == 'PATIENT':
-            if int(patient_id) != user_id:
-                return Diagnosis.objects.none()
-        elif user_role not in ['DOCTOR', 'ADMIN']:
-            return Diagnosis.objects.none()
-
         return Diagnosis.objects.filter(
             encounter__medical_record__patient_id=patient_id,
             encounter_id=encounter_id
@@ -106,22 +91,14 @@ class DiagnosisViewSet(viewsets.ModelViewSet):
 
 class TreatmentPlanViewSet(viewsets.ModelViewSet):
     """ViewSet for managing treatment plans."""
+    queryset = TreatmentPlan.objects.all()
     serializer_class = TreatmentPlanSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow all requests
 
     def get_queryset(self):
         """Filter treatment plans based on user role and ID."""
         patient_id = self.kwargs.get('patient_id')
         encounter_id = self.kwargs.get('encounter_id')
-        user_id = self.request.user.id
-        user_role = self.request.user.role.name
-
-        if user_role == 'PATIENT':
-            if int(patient_id) != user_id:
-                return TreatmentPlan.objects.none()
-        elif user_role not in ['DOCTOR', 'NURSE', 'ADMIN']:
-            return TreatmentPlan.objects.none()
-
         return TreatmentPlan.objects.filter(
             encounter__medical_record__patient_id=patient_id,
             encounter_id=encounter_id
@@ -138,22 +115,14 @@ class TreatmentPlanViewSet(viewsets.ModelViewSet):
 
 class VitalSignViewSet(viewsets.ModelViewSet):
     """ViewSet for managing vital signs."""
+    queryset = VitalSign.objects.all()
     serializer_class = VitalSignSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow all requests
 
     def get_queryset(self):
         """Filter vital signs based on user role and ID."""
         patient_id = self.kwargs.get('patient_id')
         encounter_id = self.kwargs.get('encounter_id')
-        user_id = self.request.user.id
-        user_role = self.request.user.role.name
-
-        if user_role == 'PATIENT':
-            if int(patient_id) != user_id:
-                return VitalSign.objects.none()
-        elif user_role not in ['DOCTOR', 'NURSE', 'ADMIN']:
-            return VitalSign.objects.none()
-
         return VitalSign.objects.filter(
             encounter__medical_record__patient_id=patient_id,
             encounter_id=encounter_id
@@ -171,21 +140,12 @@ class VitalSignViewSet(viewsets.ModelViewSet):
 class LabResultReferenceViewSet(viewsets.ModelViewSet):
     """ViewSet for managing lab result references."""
     serializer_class = LabResultReferenceSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow all requests
 
     def get_queryset(self):
         """Filter lab result references based on user role and ID."""
         patient_id = self.kwargs.get('patient_id')
         encounter_id = self.kwargs.get('encounter_id')
-        user_id = self.request.user.id
-        user_role = self.request.user.role.name
-
-        if user_role == 'PATIENT':
-            if int(patient_id) != user_id:
-                return LabResultReference.objects.none()
-        elif user_role not in ['DOCTOR', 'NURSE', 'ADMIN']:
-            return LabResultReference.objects.none()
-
         return LabResultReference.objects.filter(
             encounter__medical_record__patient_id=patient_id,
             encounter_id=encounter_id
@@ -203,21 +163,12 @@ class LabResultReferenceViewSet(viewsets.ModelViewSet):
 class PrescriptionReferenceViewSet(viewsets.ModelViewSet):
     """ViewSet for managing prescription references."""
     serializer_class = PrescriptionReferenceSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]  # Allow all requests
 
     def get_queryset(self):
         """Filter prescription references based on user role and ID."""
         patient_id = self.kwargs.get('patient_id')
         encounter_id = self.kwargs.get('encounter_id')
-        user_id = self.request.user.id
-        user_role = self.request.user.role.name
-
-        if user_role == 'PATIENT':
-            if int(patient_id) != user_id:
-                return PrescriptionReference.objects.none()
-        elif user_role not in ['DOCTOR', 'NURSE', 'ADMIN']:
-            return PrescriptionReference.objects.none()
-
         return PrescriptionReference.objects.filter(
             encounter__medical_record__patient_id=patient_id,
             encounter_id=encounter_id
