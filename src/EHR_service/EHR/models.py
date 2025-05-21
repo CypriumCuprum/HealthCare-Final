@@ -1,5 +1,6 @@
 from django.db import models
 from django.utils.translation import gettext_lazy as _
+import uuid
 
 
 class MedicalRecord(models.Model):
@@ -65,6 +66,8 @@ class Encounter(models.Model):
     encounter_id = models.UUIDField(
         _('Encounter ID'),
         unique=True,
+        default=uuid.uuid4,
+        editable=False,
         help_text=_('Unique ID for encounter')
     )
     doctor_id = models.IntegerField(
@@ -129,6 +132,8 @@ class Diagnosis(models.Model):
     )
     diagnosis_id = models.UUIDField(
         _('Diagnosis ID'),
+        default=uuid.uuid4,
+        editable=False,
         unique=True
     )
     icd_code = models.CharField(
@@ -174,6 +179,8 @@ class TreatmentPlan(models.Model):
     )
     treatment_plan_id = models.UUIDField(
         _('Treatment Plan ID'),
+        default=uuid.uuid4,
+        editable=False,
         unique=True
     )
     description = models.TextField(
@@ -213,6 +220,8 @@ class VitalSign(models.Model):
     )
     vital_id = models.UUIDField(
         _('Vital ID'),
+        default=uuid.uuid4,
+        editable=False,
         unique=True
     )
     nurse_id = models.IntegerField(
