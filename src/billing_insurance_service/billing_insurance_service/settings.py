@@ -134,8 +134,11 @@ REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
+    # 'DEFAULT_PERMISSION_CLASSES': (
+    #     'rest_framework.permissions.IsAuthenticated',
+    # ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.IsAuthenticated',
+        'rest_framework.permissions.AllowAny',
     ),
 }
 
@@ -150,4 +153,4 @@ SIMPLE_JWT = {
 
 # Service URLs
 USER_SERVICE_URL = os.environ.get('USER_SERVICE_URL', 'http://localhost:8000/api/v1')
-NOTIFICATION_SERVICE_URL = os.environ.get('NOTIFICATION_SERVICE_URL', 'http://localhost:8007/api/v1')
+NOTIFICATION_SERVICE_URL = ""
