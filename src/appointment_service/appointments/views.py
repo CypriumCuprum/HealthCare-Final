@@ -5,6 +5,7 @@ from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from django.conf import settings
 
 from .models import Appointment, DoctorSchedule, TimeSlot
 from .serializers import (
@@ -107,11 +108,11 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment = serializer.save()
         
         # Send notifications
-        send_appointment_notification.delay(
+        send_appointment_notification(
             appointment.id,
             'APPOINTMENT_REQUESTED_PATIENT'
         )
-        send_appointment_notification.delay(
+        send_appointment_notification(
             appointment.id,
             'APPOINTMENT_REQUESTED_DOCTOR'
         )
@@ -130,7 +131,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment.save()
         
         # Send notification to patient
-        send_appointment_notification.delay(
+        send_appointment_notification(
             appointment.id,
             'APPOINTMENT_CONFIRMED_PATIENT'
         )
@@ -151,7 +152,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
         appointment.save()
         
         # Process the completed appointment (notify EHR and Billing)
-        process_completed_appointment.delay(
+        process_completed_appointment(
             appointment.id,
             token=request.auth
         )
@@ -191,7 +192,7 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             pass
         
         # Send cancellation notification
-        send_appointment_notification.delay(
+        send_appointment_notification(
             appointment.id,
             'APPOINTMENT_CANCELLED'
         )
@@ -246,7 +247,7 @@ class DoctorScheduleViewSet(viewsets.ModelViewSet):
                 )
                 
         # Start background task to generate slots
-        task = generate_timeslots_for_doctor.delay(
+        task = generate_timeslots_for_doctor(
             doctor_id=doctor_id,
             start_date=start_date_str if start_date_str else None,
             days=days
