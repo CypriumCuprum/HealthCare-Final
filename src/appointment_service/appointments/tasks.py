@@ -106,11 +106,11 @@ def send_appointment_reminders():
     )
     
     for appointment in appointments:
-        send_appointment_notification.delay(
+        send_appointment_notification(
             appointment.id,
             'APPOINTMENT_REMINDER_PATIENT'
         )
-        send_appointment_notification.delay(
+        send_appointment_notification(
             appointment.id,
             'APPOINTMENT_REMINDER_DOCTOR'
         )
