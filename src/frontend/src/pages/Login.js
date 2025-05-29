@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Form, Button, Alert, Card } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -6,14 +6,20 @@ import { useAuth } from '../contexts/AuthContext';
 const Login = () => {
   const [formData, setFormData] = useState({
     username: '',
-    password: '',
-    role: 'PATIENT'
+    password: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
-  const { login } = useAuth();
+  const { login, isAuthenticated, role } = useAuth();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      console.log('User is authenticated, role:', role);
+      navigate('/', { replace: true });
+    }
+  }, [isAuthenticated, role, navigate]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -26,17 +32,20 @@ const Login = () => {
     setLoading(true);
     
     try {
-      const { username, password, role } = formData;
-      const result = await login(username, password, role);
+      const { username, password } = formData;
+      console.log('Attempting login...');
+      const result = await login(username, password);
+      console.log('Login result:', result);
       
       if (result.success) {
-        navigate('/');
+        console.log('Login successful, navigating to dashboard...');
+        // Navigation will be handled by useEffect
       } else {
         setError(result.error || 'Login failed');
       }
     } catch (err) {
+      console.error('Login error:', err);
       setError('An error occurred during login');
-      console.error(err);
     } finally {
       setLoading(false);
     }
@@ -62,7 +71,7 @@ const Login = () => {
               />
             </Form.Group>
             
-            <Form.Group className="mb-3">
+            <Form.Group className="mb-4">
               <Form.Label>Password</Form.Label>
               <Form.Control
                 type="password"
@@ -72,24 +81,6 @@ const Login = () => {
                 required
                 placeholder="Enter your password"
               />
-            </Form.Group>
-            
-            <Form.Group className="mb-4">
-              <Form.Label>Role</Form.Label>
-              <Form.Select
-                name="role"
-                value={formData.role}
-                onChange={handleChange}
-                required
-              >
-                <option value="PATIENT">Patient</option>
-                <option value="DOCTOR">Doctor</option>
-                <option value="PHARMACIST">Pharmacist</option>
-                <option value="ADMIN">Admin</option>
-              </Form.Select>
-              <Form.Text className="text-muted">
-                For development purposes, select your role here.
-              </Form.Text>
             </Form.Group>
             
             <div className="d-grid gap-2">

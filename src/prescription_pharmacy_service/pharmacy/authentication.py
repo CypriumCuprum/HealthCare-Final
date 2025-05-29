@@ -18,20 +18,27 @@ TOKENS = {
 # Default token that will work for any request (for development)
 DEFAULT_TOKEN = 'dev_token_123456'
 
-# Create a custom AnonymousUser
-class CustomAnonymousUser(AnonymousUser):
-    """Custom Anonymous User with user ID for services"""
-    def __init__(self, id=None):
+# Create user from token
+class TokenUser(AnonymousUser):
+    """User created from token authentication"""
+    def __init__(self, id=None, role=None):
         super().__init__()
         self.id = id
+        self.role = role
         
     @property
     def is_authenticated(self):
-        return False
+        # User từ token hợp lệ nên được coi là đã xác thực
+        return True
     
     @property
     def is_anonymous(self):
-        return True
+        # Không còn anonymous nữa vì đã xác thực
+        return False
+    
+    def has_role(self, role_name):
+        """Check if user has specific role"""
+        return self.role == role_name
 
 
 class SimpleTokenAuthentication(BaseAuthentication):
@@ -41,9 +48,11 @@ class SimpleTokenAuthentication(BaseAuthentication):
     """
     def authenticate(self, request):
         # Extract token from Authorization header
-        print(request.META)
         auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        print(f"Received Authorization header: {auth_header}")
+        
         if not auth_header:
+            print("No Authorization header found")
             return None
             
         try:
@@ -53,20 +62,28 @@ class SimpleTokenAuthentication(BaseAuthentication):
             else:
                 token = auth_header
                 
+            print(f"Extracted token: {token[:10]}...")
+                
             # Try to verify token with User Service
-            user_id = self.verify_token(token)
-            if user_id:
-                user = CustomAnonymousUser(id=user_id)
+            user_data = self.verify_token(token)
+            print(f"Token verification result: {user_data}")
+            
+            if user_data and 'user_id' in user_data:
+                print(f"Token verified successfully. User data: {user_data}")
+                user = TokenUser(
+                    id=user_data['user_id'], 
+                    role=user_data.get('role')
+                )
                 return (user, token)
                 
-            # Token not recognized
+            print("Token verification failed")
             return None
             
         except Exception as e:
+            print(f"Authentication error: {str(e)}")
             return None
 
     def authenticate_header(self, request):
-        print("authenticate_header")
         return 'Bearer'
         
     def verify_token(self, token):
@@ -74,29 +91,30 @@ class SimpleTokenAuthentication(BaseAuthentication):
         Verify token with User Service.
         """
         try:
-            print(f"{settings.USER_SERVICE_URL}/token/verify/")
+            verify_url = f"{settings.USER_SERVICE_URL}/token/verify/"
+            print(f"Making request to User Service at: {verify_url}")
+            print(f"Request payload: {{'token': '{token[:10]}...'}}")
+            
             response = requests.post(
-                f"{settings.USER_SERVICE_URL}/token/verify/",
-                json={'token': token}
+                verify_url,
+                json={'token': token},
+                timeout=5  # Add timeout to avoid hanging
             )
             
+            print(f"User Service response status: {response.status_code}")
+            print(f"User Service response data: {response.text}")
+            
             if response.status_code == 200:
-                return response.json().get('user_id')
-                
-            # If User Service is unavailable, try local verification
-            if token == DEFAULT_TOKEN:
-                return 1  # Default user ID
-                
-            if token in TOKENS:
-                return TOKENS[token]
-                
+                data = response.json()
+                if data.get('valid'):
+                    return {
+                        'user_id': data.get('user_id'),
+                        'role': data.get('role')
+                    }
+            
+            print("Token verification failed with User Service")
             return None
-        except requests.RequestException:
-            # Connection error, fall back to local verification
-            if token == DEFAULT_TOKEN:
-                return 1
                 
-            if token in TOKENS:
-                return TOKENS[token]
-                
+        except requests.RequestException as e:
+            print(f"Error connecting to User Service: {str(e)}")
             return None 

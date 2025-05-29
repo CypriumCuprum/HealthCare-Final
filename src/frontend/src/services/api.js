@@ -1,8 +1,8 @@
 import axios from 'axios';
 
-// Base URLs for our services
+// Base URLs for our services - đảm bảo port đúng với cấu hình thực tế
 const USER_SERVICE_URL = 'http://localhost:8000/api/v1';
-const PHARMACY_SERVICE_URL = 'http://localhost:8081/api/v1';
+const PHARMACY_SERVICE_URL = 'http://localhost:8001/api/v1';
 
 // Create axios instances with default configs
 const userServiceApi = axios.create({
@@ -26,32 +26,110 @@ const addAuthInterceptor = (axiosInstance) => {
       const token = localStorage.getItem('auth_token');
       if (token) {
         config.headers['Authorization'] = `Bearer ${token}`;
+        console.log('Adding token to request:', {
+          url: config.url,
+          method: config.method,
+          headers: config.headers
+        });
+      } else {
+        console.log('No token found for request:', {
+          url: config.url,
+          method: config.method
+        });
       }
       return config;
     },
     (error) => {
+      console.error('Request interceptor error:', error);
+      return Promise.reject(error);
+    }
+  );
+
+  // Add response interceptor to handle errors
+  axiosInstance.interceptors.response.use(
+    (response) => {
+      console.log('Response received:', {
+        url: response.config.url,
+        status: response.status,
+        data: response.data
+      });
+      return response;
+    },
+    async (error) => {
+      const originalRequest = error.config;
+      
+      // If error is 403 and we haven't tried to refresh token yet
+      if (error.response?.status === 403 && !originalRequest._retry) {
+        originalRequest._retry = true;
+        
+        try {
+          const refreshToken = localStorage.getItem('refresh_token');
+          if (!refreshToken) {
+            throw new Error('No refresh token available');
+          }
+
+          console.log('Attempting to refresh token...');
+          // Try to refresh the token
+          const response = await userServiceApi.post('/token/refresh/', {
+            refresh: refreshToken
+          });
+
+          const { access } = response.data;
+          console.log('Token refreshed successfully');
+          localStorage.setItem('auth_token', access);
+
+          // Retry the original request with new token
+          originalRequest.headers['Authorization'] = `Bearer ${access}`;
+          return axiosInstance(originalRequest);
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          // Clear auth data and redirect to login
+          localStorage.removeItem('auth_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('user_role');
+          window.location.href = '/login';
+          return Promise.reject(refreshError);
+        }
+      }
+
+      console.error('API Error:', {
+        url: originalRequest.url,
+        method: originalRequest.method,
+        status: error.response?.status,
+        data: error.response?.data,
+        headers: originalRequest.headers
+      });
+      
       return Promise.reject(error);
     }
   );
 };
 
-// Apply the interceptor to our instances
+// Apply the interceptor to both service instances
 addAuthInterceptor(userServiceApi);
-// addAuthInterceptor(pharmacyServiceApi);
+addAuthInterceptor(pharmacyServiceApi);
 
 // Auth endpoints
 export const authService = {
-  login: (credentials) => userServiceApi.post('/users/login/', credentials),
-  register: (userData) => userServiceApi.post('/users/register/', userData),
+  login: (credentials) => userServiceApi.post('/login/', credentials),
+  register: (userData) => userServiceApi.post('/register/', userData),
   getCurrentUser: () => userServiceApi.get('/users/me/'),
-  verifyToken: (token) => userServiceApi.post('/users/token/verify/', { token }),
+  verifyToken: (token) => userServiceApi.post('/token/verify/', { token }),
+  refreshToken: (refresh) => userServiceApi.post('/token/refresh/', { refresh }),
 };
 
 // User endpoints
 export const userService = {
   getUserDetails: (userId) => userServiceApi.get(`/users/${userId}/`),
-  updateUserDetails: (userData) => userServiceApi.put('/users/me/', userData),
-  changePassword: (passwordData) => userServiceApi.post('/users/password/change/', passwordData),
+  updateUserDetails: (userData) => userServiceApi.patch('/users/me/', userData),
+  changePassword: (passwordData) => userServiceApi.post('/users/change_password/', passwordData),
+};
+
+// Medication catalog - available to all authenticated users
+export const medicationService = {
+  getMedications: () => pharmacyServiceApi.get('/medications/catalog/'),
+  getMedicationById: (medicationId) => pharmacyServiceApi.get(`/medications/catalog/${medicationId}/`),
 };
 
 // Pharmacy endpoints - Doctor role
@@ -91,27 +169,24 @@ export const pharmacistPharmacyService = {
 // Admin endpoints
 export const adminService = {
   // Medication catalog management
-  getMedications: () => 
-    pharmacyServiceApi.get('/admin/medications/catalog/'),
-  getMedicationById: (medicationId) => 
-    pharmacyServiceApi.get(`/admin/medications/catalog/${medicationId}/`),
   createMedication: (medicationData) => 
-    pharmacyServiceApi.post('/admin/medications/catalog/', medicationData),
+    pharmacyServiceApi.post('/medications/catalog/', medicationData),
   updateMedication: (medicationId, medicationData) => 
-    pharmacyServiceApi.put(`/admin/medications/catalog/${medicationId}/`, medicationData),
+    pharmacyServiceApi.put(`/medications/catalog/${medicationId}/`, medicationData),
   deleteMedication: (medicationId) => 
-    pharmacyServiceApi.delete(`/admin/medications/catalog/${medicationId}/`),
+    pharmacyServiceApi.delete(`/medications/catalog/${medicationId}/`),
     
-  // User management (for future implementation)
+  // User management
   getUsers: () => 
-    userServiceApi.get('/admin/users/'),
+    userServiceApi.get('/users/'),
   getUserById: (userId) => 
-    userServiceApi.get(`/admin/users/${userId}/`),
+    userServiceApi.get(`/users/${userId}/`),
 };
 
 export default {
   authService,
   userService,
+  medicationService,
   doctorPharmacyService,
   patientPharmacyService,
   pharmacistPharmacyService,

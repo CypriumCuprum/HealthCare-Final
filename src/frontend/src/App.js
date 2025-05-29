@@ -32,30 +32,64 @@ const ProtectedRoute = ({ element, roles }) => {
   const { isAuthenticated, role, loading } = useAuth();
   
   if (loading) {
+    console.log('Loading auth state...');
     return <div>Loading...</div>;
   }
   
   if (!isAuthenticated) {
+    console.log('Not authenticated, redirecting to login');
     return <Navigate to="/login" replace />;
   }
   
-  if (roles && !roles.includes(role)) {
+  // Check if role is an object and extract the name
+  const roleName = typeof role === 'object' ? role?.name : role;
+  
+  if (roles && roleName && !roles.includes(roleName)) {
+    console.log('Unauthorized role:', roleName, 'required roles:', roles);
     return <Navigate to="/" replace />;
   }
   
+  console.log('Access granted for role:', roleName);
   return element;
 };
 
 // Main App
 function AppContent() {
-  const { isAuthenticated, role } = useAuth();
+  const { isAuthenticated, role, loading } = useAuth();
+  
+  if (loading) {
+    console.log('App is loading auth state...');
+    return <div>Loading...</div>;
+  }
+  
+  // Check if role is an object and extract the name
+  const roleName = typeof role === 'object' ? role?.name : role;
+  console.log('Current auth state:', { isAuthenticated, role: roleName });
   
   return (
     <Router>
       <Routes>
         {/* Auth Routes */}
-        <Route path="/login" element={!isAuthenticated ? <Login /> : <Navigate to="/" replace />} />
-        <Route path="/register" element={!isAuthenticated ? <Register /> : <Navigate to="/" replace />} />
+        <Route 
+          path="/login" 
+          element={
+            !isAuthenticated ? (
+              <Login />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
+        <Route 
+          path="/register" 
+          element={
+            !isAuthenticated ? (
+              <Register />
+            ) : (
+              <Navigate to="/" replace />
+            )
+          } 
+        />
         
         {/* Dashboard Route - redirects based on role */}
         <Route 
@@ -63,10 +97,10 @@ function AppContent() {
           element={
             <ProtectedRoute 
               element={
-                role === 'PATIENT' ? <PatientDashboard /> :
-                role === 'DOCTOR' ? <DoctorDashboard /> :
-                role === 'PHARMACIST' ? <PharmacistDashboard /> :
-                role === 'ADMIN' ? <AdminDashboard /> :
+                roleName === 'PATIENT' ? <PatientDashboard /> :
+                roleName === 'DOCTOR' ? <DoctorDashboard /> :
+                roleName === 'PHARMACIST' ? <PharmacistDashboard /> :
+                roleName === 'ADMIN' ? <AdminDashboard /> :
                 <Navigate to="/login" replace />
               } 
               roles={['PATIENT', 'DOCTOR', 'PHARMACIST', 'ADMIN']} 

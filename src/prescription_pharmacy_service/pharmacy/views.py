@@ -14,28 +14,52 @@ from .serializers import (
     PharmacyStockSerializer, PrescriptionDispenseSerializer,
     MedicationStockUpdateSerializer
 )
-from .utils import notify_ehr_service, notify_billing_service
+from .utils import notify_ehr_service, notify_billing_service, HasRole
 
 
 class MedicationListCreateView(generics.ListCreateAPIView):
     """List and create medications"""
     queryset = Medication.objects.all()
     serializer_class = MedicationSerializer
-    permission_classes = [AllowAny] 
+    permission_classes = [IsAuthenticated]
     
+    def get_permissions(self):
+        # Xem danh sách thuốc: tất cả các users đã xác thực
+        if self.request.method == 'GET':
+            return [IsAuthenticated()]
+        # Thêm thuốc mới: chỉ admin hoặc pharmacist
+        elif self.request.method == 'POST':
+            return [IsAuthenticated(), HasRole('PHARMACIST')]
+        return [IsAuthenticated()]
+
 
 class MedicationDetailView(generics.RetrieveUpdateDestroyAPIView):
     """Retrieve, update, or delete a medication"""
     queryset = Medication.objects.all()
     serializer_class = MedicationSerializer
-    permission_classes = [AllowAny] 
+    
+    def get_permissions(self):
+        # Xem chi tiết: tất cả users đã xác thực
+        if self.request.method == 'GET':
+            return [IsAuthenticated()]
+        # Sửa/xóa: chỉ admin hoặc pharmacist
+        else:
+            return [IsAuthenticated(), HasRole('PHARMACIST')]
 
 
 class PrescriptionListCreateView(generics.ListCreateAPIView):
     """List and create prescriptions"""
     queryset = Prescription.objects.all()
     serializer_class = PrescriptionSerializer
-    permission_classes = [AllowAny] 
+    
+    def get_permissions(self):
+        # Xem danh sách: Tất cả users đã xác thực
+        if self.request.method == 'GET':
+            return [IsAuthenticated()]
+        # Tạo mới: Chỉ bác sĩ mới được tạo đơn thuốc
+        elif self.request.method == 'POST':
+            return [IsAuthenticated(), HasRole('DOCTOR')]
+        return [IsAuthenticated()]
     
     def perform_create(self, serializer):
         prescription = serializer.save()
@@ -53,13 +77,13 @@ class PrescriptionDetailView(generics.RetrieveAPIView):
     """Retrieve a prescription"""
     queryset = Prescription.objects.all()
     serializer_class = PrescriptionSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
 
 class PatientPrescriptionListView(generics.ListAPIView):
     """List prescriptions for a specific patient"""
     serializer_class = PrescriptionSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
         patient_id = self.kwargs['patient_id']
@@ -69,7 +93,9 @@ class PatientPrescriptionListView(generics.ListAPIView):
 class PendingPrescriptionListView(generics.ListAPIView):
     """List pending prescriptions for pharmacist verification"""
     serializer_class = PrescriptionSerializer
-    permission_classes = [AllowAny]
+    
+    def get_permissions(self):
+        return [IsAuthenticated(), HasRole('PHARMACIST')]
     
     def get_queryset(self):
         return Prescription.objects.filter(
@@ -79,7 +105,7 @@ class PendingPrescriptionListView(generics.ListAPIView):
 
 class VerifyPrescriptionView(views.APIView):
     """Verify a prescription by pharmacist"""
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     
     def post(self, request, pk):
         prescription = get_object_or_404(Prescription, pk=pk)
@@ -101,7 +127,7 @@ class VerifyPrescriptionView(views.APIView):
 
 class DispensePrescriptionView(views.APIView):
     """Dispense medications for a prescription"""
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     @transaction.atomic
     def post(self, request, pk):
         prescription = get_object_or_404(Prescription, pk=pk)
@@ -207,16 +233,16 @@ class DispensePrescriptionView(views.APIView):
         )
 
 
-class PharmacyStockListCreateView(generics.ListCreateAPIView): # Đổi tên class và kế thừa
-    """List all pharmacy stock items or create a new one""" # Cập nhật docstring
+class PharmacyStockListCreateView(generics.ListCreateAPIView):
+    """List all pharmacy stock items or create a new one"""
     queryset = PharmacyStock.objects.all()
     serializer_class = PharmacyStockSerializer
-    permission_classes = [AllowAny] # Giữ nguyên hoặc thay đổi nếu cần
+    permission_classes = [IsAuthenticated]
 
 
 class PharmacyStockUpdateView(views.APIView):
     """Update pharmacy stock (add inventory)"""
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
     @transaction.atomic
     def post(self, request, pk):
         stock = get_object_or_404(PharmacyStock, pk=pk)

@@ -11,6 +11,8 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - healthcare-network
 
   mongodb:
     image: mongo:6.0
@@ -18,25 +20,8 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-
-  # Message Broker & Cache
-  redis:
-    image: redis:7.2
-    ports:
-      - "6379:6379"
-
-  # Object Storage
-  minio:
-    image: minio/minio
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    environment:
-      MINIO_ROOT_USER: minioadmin
-      MINIO_ROOT_PASSWORD: minioadmin
-    volumes:
-      - minio_data:/data
-    command: server /data --console-address ":9001"
+    networks:
+      - healthcare-network
 
   # API Gateway (Nginx)
   nginx:
@@ -47,16 +32,188 @@ services:
       - ./nginx/conf.d:/etc/nginx/conf.d
       - ./nginx/ssl:/etc/nginx/ssl
     depends_on:
-      - user_service
-      - ehr_service
-      - appointment_service
-      - prescription_pharmacy_service
-      - laboratory_service
-      - billing_insurance_service
-      - notification_service
-      - admin_service
+      - user-service
+      - ehr-service
+      - appointment-service
+      - prescription-service
+      - laboratory-service
+      - billing-service
+      - notification-service
+      - admin-service
+    networks:
+      - healthcare-network
+
+  user-service:
+    build:
+      context: ./src/user_service
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=user_service.settings
+      - DATABASE_URL=mysql://root:rootpassword@mysql:3306/healthcare
+    volumes:
+      - ./src/user_service:/app
+    networks:
+      - healthcare-network
+    depends_on:
+      - mysql
+
+  ehr-service:
+    build:
+      context: ./src/EHR_service
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=EHR_service.settings
+      - DATABASE_URL=mysql://root:rootpassword@mysql:3306/healthcare
+    volumes:
+      - ./src/EHR_service:/app
+    networks:
+      - healthcare-network
+    depends_on:
+      - mysql
+
+  appointment-service:
+    build:
+      context: ./src/appointment_service
+      dockerfile: Dockerfile
+    ports:
+      - "8003:8003"
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=appointment_service.settings
+      - DATABASE_URL=mysql://root:rootpassword@mysql:3306/healthcare
+    volumes:
+      - ./src/appointment_service:/app
+    networks:
+      - healthcare-network
+    depends_on:
+      - mysql
+
+  prescription-service:
+    build:
+      context: ./src/prescription_pharmacy_service
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=prescription_pharmacy_service.settings
+      - DATABASE_URL=mysql://root:rootpassword@mysql:3306/healthcare
+    volumes:
+      - ./src/prescription_pharmacy_service:/app
+    networks:
+      - healthcare-network
+    depends_on:
+      - mysql
+
+  laboratory-service:
+    build:
+      context: ./src/laboratory_service
+      dockerfile: Dockerfile
+    ports:
+      - "8004:8004"
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=laboratory_service.settings
+      - DATABASE_URL=mysql://root:rootpassword@mysql:3306/healthcare
+    volumes:
+      - ./src/laboratory_service:/app
+    networks:
+      - healthcare-network
+    depends_on:
+      - mysql
+
+  billing-service:
+    build:
+      context: ./src/billing_insurance_service
+      dockerfile: Dockerfile
+    ports:
+      - "8005:8005"
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=billing_insurance_service.settings
+      - DATABASE_URL=mysql://root:rootpassword@mysql:3306/healthcare
+    volumes:
+      - ./src/billing_insurance_service:/app
+    networks:
+      - healthcare-network
+    depends_on:
+      - mysql
+
+  notification-service:
+    build:
+      context: ./src/notification_service
+      dockerfile: Dockerfile
+    ports:
+      - "8006:8006"
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=notification_service.settings
+      - DATABASE_URL=mongodb://mongodb:27017/notifications
+    volumes:
+      - ./src/notification_service:/app
+    networks:
+      - healthcare-network
+    depends_on:
+      - mongodb
+
+  admin-service:
+    build:
+      context: ./src/admin_service
+      dockerfile: Dockerfile
+    ports:
+      - "8007:8007"
+    environment:
+      - DEBUG=1
+      - DJANGO_SETTINGS_MODULE=admin_service.settings
+      - DATABASE_URL=mysql://root:rootpassword@mysql:3306/healthcare
+    volumes:
+      - ./src/admin_service:/app
+    networks:
+      - healthcare-network
+    depends_on:
+      - mysql
+
+  frontend:
+    build:
+      context: ./src/frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - REACT_APP_API_URL=http://localhost:8000
+      - REACT_APP_PRESCRIPTION_API_URL=http://localhost:8001
+      - REACT_APP_EHR_API_URL=http://localhost:8002
+      - REACT_APP_APPOINTMENT_API_URL=http://localhost:8003
+      - REACT_APP_LABORATORY_API_URL=http://localhost:8004
+      - REACT_APP_BILLING_API_URL=http://localhost:8005
+      - REACT_APP_NOTIFICATION_API_URL=http://localhost:8006
+      - REACT_APP_ADMIN_API_URL=http://localhost:8007
+    volumes:
+      - ./src/frontend:/app
+      - /app/node_modules
+    networks:
+      - healthcare-network
+    depends_on:
+      - user-service
+      - prescription-service
+      - ehr-service
+      - appointment-service
+      - laboratory-service
+      - billing-service
+      - notification-service
+      - admin-service
 
 volumes:
   mysql_data:
   mongodb_data:
   minio_data:
+
+networks:
+  healthcare-network:
+    driver: bridge

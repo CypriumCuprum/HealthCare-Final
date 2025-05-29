@@ -2,6 +2,7 @@ import requests
 from django.conf import settings
 from rest_framework import authentication, exceptions
 from rest_framework.authentication import BaseAuthentication
+from rest_framework.permissions import BasePermission
 
 from .authentication import SimpleTokenAuthentication
 
@@ -94,4 +95,28 @@ def notify_billing_service(dispense_log_id, patient_id, items, token=None):
         )
         return response.status_code in [200, 201, 202]
     except requests.RequestException:
+        return False
+
+
+class HasRole(BasePermission):
+    """
+    Permission class to check if user has specific role.
+    Admin can do everything.
+    """
+    def __init__(self, required_role):
+        self.required_role = required_role
+    
+    def has_permission(self, request, view):
+        # ADMIN có quyền làm mọi thứ
+        if hasattr(request.user, 'role'):
+            if isinstance(request.user.role, dict) and request.user.role.get('name') == 'ADMIN':
+                return True
+            elif request.user.role == 'ADMIN':
+                return True
+            
+        # Kiểm tra role yêu cầu
+        if hasattr(request.user, 'role'):
+            if isinstance(request.user.role, dict):
+                return request.user.role.get('name') == self.required_role
+            return request.user.role == self.required_role
         return False 

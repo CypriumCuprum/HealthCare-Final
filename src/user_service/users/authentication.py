@@ -68,6 +68,9 @@ def get_tokens_for_user(user):
     """
     refresh = RefreshToken.for_user(user)
     
+    # Chỉ thêm role vào token payload
+    refresh['role'] = user.role.name if user.role else None
+    
     return {
         'refresh': str(refresh),
         'access': str(refresh.access_token),

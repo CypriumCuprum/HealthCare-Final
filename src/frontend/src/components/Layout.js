@@ -2,9 +2,10 @@ import React from 'react';
 import { Container, Navbar, Nav, Button } from 'react-bootstrap';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import ChatbotButton from './ChatbotButton';
 
 const Layout = ({ children }) => {
-  const { currentUser, role, logout } = useAuth();
+  const { currentUser, role, logout, isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -14,6 +15,10 @@ const Layout = ({ children }) => {
 
   // Get navigation links based on user role
   const getNavLinks = () => {
+    if (!isAuthenticated || !role) {
+      return null;
+    }
+
     switch (role) {
       case 'PATIENT':
         return (
@@ -61,10 +66,10 @@ const Layout = ({ children }) => {
               {getNavLinks()}
             </Nav>
             <Nav>
-              {currentUser ? (
+              {isAuthenticated && currentUser ? (
                 <div className="d-flex align-items-center">
                   <span className="text-white me-3">
-                    Hello, {currentUser.first_name} ({role})
+                    Hello, {currentUser?.first_name || 'User'} ({role})
                   </span>
                   <Button variant="outline-light" onClick={handleLogout}>
                     Logout
@@ -84,6 +89,8 @@ const Layout = ({ children }) => {
       <Container className="py-3">
         {children}
       </Container>
+
+      {isAuthenticated && role === 'PATIENT' && <ChatbotButton />}
 
       <footer className="bg-light py-3 mt-5">
         <Container>

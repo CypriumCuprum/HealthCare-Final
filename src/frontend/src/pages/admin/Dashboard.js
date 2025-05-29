@@ -1,17 +1,31 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Card, Row, Col, Button } from 'react-bootstrap';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Layout from '../../components/Layout';
 import { useAuth } from '../../contexts/AuthContext';
 
 const AdminDashboard = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, isAuthenticated, role } = useAuth();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!isAuthenticated || role !== 'ADMIN') {
+      console.log('Not authenticated or not admin, redirecting');
+      navigate('/login');
+    }
+  }, [isAuthenticated, role, navigate]);
+
+  if (!isAuthenticated || role !== 'ADMIN') {
+    return null;
+  }
 
   return (
     <Layout>
       <div className="mb-4">
         <h2>Admin Dashboard</h2>
-        <p className="text-muted">Welcome, {currentUser.first_name}! Manage system configuration and settings.</p>
+        <p className="text-muted">
+          Welcome, {currentUser?.first_name || 'Admin'}! Manage system configuration and settings.
+        </p>
       </div>
 
       <div className="dashboard-stats">

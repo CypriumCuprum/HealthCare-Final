@@ -53,24 +53,26 @@ class TokenVerifyView(generics.GenericAPIView):
         token = request.data.get('token', '')
         
         try:
-            # For now, simply create a new JWT auth object and verify the token
-            from rest_framework_simplejwt.authentication import JWTAuthentication
-            
-            jwt_auth = JWTAuthentication()
+            # Sử dụng CustomJWTAuthentication
+            jwt_auth = CustomJWTAuthentication()
             validated_token = jwt_auth.get_validated_token(token)
-            user = jwt_auth.get_user(validated_token)
             
-            if user and user.is_active:
-                # Return minimal information to verify the token
+            # Trích xuất thông tin từ token
+            user_id = validated_token.get('user_id')
+            role = validated_token.get('role')
+            
+            if user_id:
+                # Token hợp lệ, trả về user_id và role
                 return Response({
                     'valid': True,
-                    'user_id': user.id
-                })
+                    'user_id': user_id,
+                    'role': {'name': role} if role else None
+                }, status=status.HTTP_200_OK)
                 
-            return Response({'valid': False}, status=status.HTTP_401_UNAUTHORIZED)
-        except Exception:
-            # Any exception means the token is invalid
-            return Response({'valid': False}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({'valid': False}, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Token verification failed: {str(e)}")
+            return Response({'valid': False}, status=status.HTTP_200_OK)
 
 
 class RegisterView(generics.CreateAPIView):

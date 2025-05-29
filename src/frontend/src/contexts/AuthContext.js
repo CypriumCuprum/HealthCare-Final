@@ -4,88 +4,99 @@ import { authService } from '../services/api';
 // Create Auth Context
 const AuthContext = createContext(null);
 
-// In development, we'll use hardcoded tokens for testing
-const TOKENS = {
-  PATIENT: 'patient_token',
-  DOCTOR: 'doctor_token',
-  ADMIN: 'admin_token',
-  PHARMACIST: 'admin_token', // Using admin token for pharmacist in this example
-  DEFAULT: 'dev_token_123456'
-};
-
 // Auth Provider Component
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [role, setRole] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [token, setToken] = useState(null);
 
   // Initialize auth state from localStorage
   useEffect(() => {
-    const token = localStorage.getItem('auth_token');
+    const storedToken = localStorage.getItem('auth_token');
     const storedUser = localStorage.getItem('user');
     const storedRole = localStorage.getItem('user_role');
     
-    if (token && storedUser) {
+    if (storedToken && storedUser) {
+      setToken(storedToken);
       setCurrentUser(JSON.parse(storedUser));
       setRole(storedRole);
+      
+      // Verify token is still valid
+      verifyToken(storedToken);
+    } else {
+      setLoading(false);
     }
-    
-    setLoading(false);
   }, []);
 
-  // Login function - in a real app, this would validate with the backend
-  const login = async (username, password, selectedRole) => {
+  // Verify token validity with backend
+  const verifyToken = async (token) => {
+    try {
+      console.log('Verifying token...');
+      const response = await authService.verifyToken(token);
+      console.log('Token verification response:', response.data);
+      
+      if (response.data.valid) {
+        // Token is valid, update user state
+        console.log('Token is valid');
+        console.log('User data:', response.data);
+        setCurrentUser({ id: response.data.user_id });
+        setRole(response.data.role.name);
+        setLoading(false);
+      } else {
+        // Token is invalid, logout
+        console.log('Token is invalid, logout');
+        logout();
+      }
+    } catch (err) {
+      // Error verifying token, logout
+      console.error('Token verification failed:', err);
+      logout();
+    }
+  };
+
+  // Login function
+  const login = async (username, password) => {
     setLoading(true);
     setError(null);
     
     try {
-      // For development: Use hardcoded tokens based on role
-      let token;
+      console.log('Attempting login...');
+      // Call the real login API
+      const response = await authService.login({ username, password });
       
-      // In a real app, we would call the login API
-      // const response = await authService.login({ username, password });
-      // token = response.data.access_token;
-      
-      // For development, simulate different user roles with hardcoded tokens
-      switch(selectedRole) {
-        case 'PATIENT':
-          token = TOKENS.PATIENT;
-          break;
-        case 'DOCTOR':
-          token = TOKENS.DOCTOR;
-          break;
-        case 'ADMIN':
-          token = TOKENS.ADMIN;
-          break;
-        case 'PHARMACIST':
-          token = TOKENS.PHARMACIST;
-          break;
-        default:
-          token = TOKENS.DEFAULT;
-      }
-      
-      // Create a mock user for development
-      const user = {
-        id: selectedRole === 'PATIENT' ? 1 : selectedRole === 'DOCTOR' ? 2 : 3,
-        username,
-        first_name: 'Test',
-        last_name: 'User',
-        email: `${username}@example.com`
-      };
+      // Extract data from response
+      const { access, refresh, user } = response.data;
+      console.log('Login response:', {
+        access: access ? `${access.substring(0, 10)}...` : null,
+        refresh: refresh ? `${refresh.substring(0, 10)}...` : null,
+        user: user
+      });
       
       // Save auth data to localStorage
-      localStorage.setItem('auth_token', token);
+      localStorage.setItem('auth_token', access);
+      localStorage.setItem('refresh_token', refresh);
       localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('user_role', selectedRole);
+      localStorage.setItem('user_role', user.role.name);
       
+      console.log('Auth data saved to localStorage:', {
+        auth_token: access ? `${access.substring(0, 10)}...` : null,
+        refresh_token: refresh ? `${refresh.substring(0, 10)}...` : null,
+        user: user,
+        user_role: user.role.name
+      });
+      
+      setToken(access);
       setCurrentUser(user);
-      setRole(selectedRole);
+      setRole(user.role.name);
       
       return { success: true };
     } catch (err) {
-      setError(err.response?.data?.message || 'Login failed');
-      return { success: false, error: err.message };
+      console.error('Login error:', err);
+      const errorMessage = err.response?.data?.detail || 'Login failed';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -94,25 +105,26 @@ export const AuthProvider = ({ children }) => {
   // Logout function
   const logout = () => {
     localStorage.removeItem('auth_token');
+    localStorage.removeItem('refresh_token');
     localStorage.removeItem('user');
     localStorage.removeItem('user_role');
+    setToken(null);
     setCurrentUser(null);
     setRole(null);
   };
 
-  // Register function - normally would call the backend
+  // Register function
   const register = async (userData) => {
     setLoading(true);
     setError(null);
     
     try {
-      // Simulate successful registration
-      // In a real app: const response = await authService.register(userData);
-      
+      await authService.register(userData);
       return { success: true };
     } catch (err) {
-      setError(err.response?.data?.message || 'Registration failed');
-      return { success: false, error: err.message };
+      const errorMessage = err.response?.data?.detail || 'Registration failed';
+      setError(errorMessage);
+      return { success: false, error: errorMessage };
     } finally {
       setLoading(false);
     }
@@ -127,13 +139,14 @@ export const AuthProvider = ({ children }) => {
   const value = {
     currentUser,
     role,
+    token,
     loading,
     error,
     login,
     logout,
     register,
     hasRole,
-    isAuthenticated: !!currentUser,
+    isAuthenticated: !!currentUser && !!token,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
